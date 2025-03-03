@@ -14,3 +14,5 @@ src/*.vcd
 fpga/tt_sine_synth/
 fpga/.Xil/
 fpga/vivado.*
+src/vivado.*
+src/vivado_*

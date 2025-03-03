@@ -12,9 +12,6 @@
 
 `default_nettype none
 
-// Include the PWM module by Michale Bell
-`include "pwm.v"
-
 module tt_um_rte_sine_synth (
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
@@ -35,10 +32,8 @@ module tt_um_rte_sine_synth (
     reg [10:0] event_count;	// Divides 50MHz clock into events
     reg [1:0] qtr_count;	// Counts 1/4 phases	
     reg [3:0] phase_count;	// Counts 1/64 phases (1/16 of 1/4)
-    reg [3:0] phase_check;	// Phase or reversed phase
 
-    reg [10:0] next_limit;	// Max count value for the next note
-    reg [10:0] phase_limit;	// Max count value for the current note
+    reg [10:0] phase_limit;	// Max count value for the given note
     reg [7:0] last_input;	// Last input value received
     reg [4:0] delta;		// Output value delta -13 to +13 (-16 to +15)
     reg [7:0] out_val;		// Output value
@@ -58,13 +53,12 @@ module tt_um_rte_sine_synth (
 	    event_count <= 0;
 	    qtr_count <= 0;
 	    phase_count <= 0;
-	    phase_limit <= 0;
 	end else begin
-	    if (event_count == 0) begin
-		event_count <= phase_limit;
-		if (phase_count == 15) begin
+	    if (event_count >= phase_limit) begin
+		event_count <= 0;
+		if (phase_count >= 16) begin
 		    phase_count <= 0;
-		    if (qtr_count == 3) begin
+		    if (qtr_count >= 4) begin
 			qtr_count <= 0;
 		    end else begin
 			qtr_count <= qtr_count + 1;
@@ -73,51 +67,46 @@ module tt_um_rte_sine_synth (
 		    phase_count <= phase_count + 1;
 		end
 	    end else begin
-		event_count <= event_count - 1;
+		event_count <= event_count + 1;
 	    end
-
-	    // Only change notes at zero phase.
-	    if (event_count == 0 && phase_count == 15 && qtr_count == 3)
-		phase_limit <= next_limit;
 	end
     end
 
     // Inputs
     always @(posedge clk or negedge rst_n) begin
 	if (~rst_n) begin
-	    next_limit <= 0;
+	    phase_limit <= 0;
 	    last_input <= 0;
 	end else if (~rst_n_i) begin
 	    last_input <= ui_in;
 	end else begin
 	    if (ui_in[0] == 1 && last_input[0] == 0)
-		next_limit <= 11'd1493;		// Play C 523.25 Hz
+		phase_limit <= 11'd1493;	// Play C 523.25 Hz
 	    else if (ui_in[1] == 1 && last_input[1] == 0)
-		next_limit <= 11'd1330;		// Play D 587.33 Hz
+		phase_limit <= 11'd1330;	// Play D 587.33 Hz
 	    else if (ui_in[2] == 1 && last_input[2] == 0)
-		next_limit <= 11'd1185;		// Play E 659.25 Hz
+		phase_limit <= 11'd1185;	// Play E 659.25 Hz
 	    else if (ui_in[3] == 1 && last_input[3] == 0)
-		next_limit <= 11'd1119;		// Play F 698.46 Hz
+		phase_limit <= 11'd1119;	// Play F 698.46 Hz
 	    else if (ui_in[4] == 1 && last_input[4] == 0)
-		next_limit <= 11'd997;		// Play G 783.99 Hz
+		phase_limit <= 11'd997;		// Play G 783.99 Hz
 	    else if (ui_in[5] == 1 && last_input[5] == 0)
-		next_limit <= 11'd888;		// Play A 880.00 Hz
+		phase_limit <= 11'd888;		// Play A 880.00 Hz
 	    else if (ui_in[6] == 1 && last_input[6] == 0)
-		next_limit <= 11'd791;		// Play B 987.77 Hz
+		phase_limit <= 11'd791;		// Play B 987.77 Hz
 	    else if (ui_in[7] == 1 && last_input[7] == 0)
-		next_limit <= 11'd747;		// Play C 1046.5 Hz
+		phase_limit <= 11'd747;		// Play C 1046.5 Hz
 	    else if (ui_in == 0)
-		next_limit <= 0;		// Stop playing
+		phase_limit <= 0;		// Stop playing
 	
 	    last_input <= ui_in;
-
 	end
     end
 
     // Output value
     always @(posedge clk or negedge rst_n) begin
 	if (~rst_n) begin
-	    delta <= 12;
+	    delta <= 0;
 	    out_val <= 128;
 	    phase_check <= 0;
 	end else begin
@@ -133,7 +122,7 @@ module tt_um_rte_sine_synth (
 	     * small values to produce a sine wave.
 	     */
 
-	    if (event_count == 4) begin
+	    if (event_count == 0) begin
 		if (qtr_count == 0 || qtr_count == 2) begin
 		    // Forward count
 		    phase_check <= phase_count;
@@ -141,25 +130,25 @@ module tt_um_rte_sine_synth (
 		    // Backward count
 		    phase_check <= 15 - phase_count;
 		end
-	    end else if (event_count == 3) begin
+	    end else if (event_count == 2) begin
 		if (phase_check == 0)
-		    delta <= 12;
+		    delta <= 13;
 		else if (phase_check == 2)
-		    delta <= 11;
+		    delta <= 12;
 		else if (phase_check == 5)
-		    delta <= 10;
+		    delta <= 11;
 		else if (phase_check == 7)
-		    delta <= 9;
+		    delta <= 10;
 		else if (phase_check == 9)
-		    delta <= 7;
+		    delta <= 8;
 		else if (phase_check == 10)
-		    delta <= 6;
+		    delta <= 7;
 		else if (phase_check == 12)
-		    delta <= 4;
+		    delta <= 5;
 		else if (phase_check == 13)
-		    delta <= 3;
+		    delta <= 4;
 		else if (phase_check == 15)
-		    delta <= 0;
+		    delta <= 1;
 	
 	    end else if (event_count == 2) begin
 		if (qtr_count == 0 || qtr_count == 3) begin
@@ -173,20 +162,11 @@ module tt_um_rte_sine_synth (
   
     assign uo_out  = out_val;
 
-    // All but the uppermost bidirectional lines are unused;  set them to zero.
-    assign uio_out[6:0] = 7'h00;
-    // The uppermost bidirectional bit is configured as an output
-    assign uio_oe  = 8'h80;
+    // Bidirectional lines are unused;  set them to zero.
+    assign uio_out = 8'h00;
+    assign uio_oe  = 8'h00;
 
     // avoid linter warning about unused pins:
     wire _unused_pins = ena;
-
-    // Instantiate the PWM module
-    pwm_audio pwm (
-	.clk(clk),
-	.rst_n(rst_n),
-	.sample(out_val),
-	.pwm(uio_out[7])
-    );
 
 endmodule  // tt_um_rte_sine_synth
