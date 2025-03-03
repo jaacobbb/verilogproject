@@ -1,5 +1,5 @@
 /*
- * tt_um_sine_synth.v
+ * tt_um_rte_sine_synth.v
  *
  * User module with a sine-wave synthesizer
  * synthesizer produces 8-bit outputs for 8 notes C, D, E, F, G, A, B, C
@@ -32,16 +32,17 @@ module tt_um_rte_sine_synth (
     // an 11-bit counter (counts to up to 2048).
 
     reg rst_n_i;
-    reg [10:0] event_count;	// Divides 50MHz clock into events
+    reg [8:0] event_count;	// Divides 50MHz clock into events
     reg [1:0] qtr_count;	// Counts 1/4 phases	
-    reg [3:0] phase_count;	// Counts 1/64 phases (1/16 of 1/4)
-    reg [3:0] phase_check;	// Phase or reversed phase
+    reg [5:0] phase_count;	// Counts 1/256 phases (1/64 of 1/4)
+    reg [5:0] phase_check;	// Phase or reversed phase
 
     reg [10:0] next_limit;	// Max count value for the next note
     reg [10:0] phase_limit;	// Max count value for the current note
     reg [7:0] last_input;	// Last input value received
-    reg [4:0] delta;		// Output value delta -13 to +13 (-16 to +15)
-    reg [7:0] out_val;		// Output value
+    reg [7:0] new_input;	// New input value received
+    reg [4:0] delta;		// Output value delta -12 to +12 (-16 to +15)
+    reg [9:0] out_val;		// Output value (lowest two bits dropped)
 
     // Synchronized reset
     always @(posedge clk or negedge rst_n) begin
@@ -62,7 +63,7 @@ module tt_um_rte_sine_synth (
 	end else begin
 	    if (event_count == 0) begin
 		event_count <= phase_limit;
-		if (phase_count == 15) begin
+		if (phase_count == 63) begin
 		    phase_count <= 0;
 		    if (qtr_count == 3) begin
 			qtr_count <= 0;
@@ -77,7 +78,7 @@ module tt_um_rte_sine_synth (
 	    end
 
 	    // Only change notes at zero phase.
-	    if (event_count == 0 && phase_count == 15 && qtr_count == 3)
+	    if (event_count == 0 && phase_count == 63 && qtr_count == 3)
 		phase_limit <= next_limit;
 	end
     end
@@ -87,29 +88,32 @@ module tt_um_rte_sine_synth (
 	if (~rst_n) begin
 	    next_limit <= 0;
 	    last_input <= 0;
+	    new_input <= 0;
 	end else if (~rst_n_i) begin
-	    last_input <= ui_in;
+	    last_input <= new_input;
+	    new_input <= ui_in;
 	end else begin
-	    if (ui_in[0] == 1 && last_input[0] == 0)
-		next_limit <= 11'd1493;		// Play C 523.25 Hz
-	    else if (ui_in[1] == 1 && last_input[1] == 0)
-		next_limit <= 11'd1330;		// Play D 587.33 Hz
-	    else if (ui_in[2] == 1 && last_input[2] == 0)
-		next_limit <= 11'd1185;		// Play E 659.25 Hz
-	    else if (ui_in[3] == 1 && last_input[3] == 0)
-		next_limit <= 11'd1119;		// Play F 698.46 Hz
-	    else if (ui_in[4] == 1 && last_input[4] == 0)
-		next_limit <= 11'd997;		// Play G 783.99 Hz
-	    else if (ui_in[5] == 1 && last_input[5] == 0)
-		next_limit <= 11'd888;		// Play A 880.00 Hz
-	    else if (ui_in[6] == 1 && last_input[6] == 0)
-		next_limit <= 11'd791;		// Play B 987.77 Hz
-	    else if (ui_in[7] == 1 && last_input[7] == 0)
-		next_limit <= 11'd747;		// Play C 1046.5 Hz
-	    else if (ui_in == 0)
+	    if (new_input[0] == 1 && last_input[0] == 0)
+		next_limit <= 11'd373;		// Play C 523.25 Hz
+	    else if (new_input[1] == 1 && last_input[1] == 0)
+		next_limit <= 11'd333;		// Play D 587.33 Hz
+	    else if (new_input[2] == 1 && last_input[2] == 0)
+		next_limit <= 11'd296;		// Play E 659.25 Hz
+	    else if (new_input[3] == 1 && last_input[3] == 0)
+		next_limit <= 11'd280;		// Play F 698.46 Hz
+	    else if (new_input[4] == 1 && last_input[4] == 0)
+		next_limit <= 11'd249;		// Play G 783.99 Hz
+	    else if (new_input[5] == 1 && last_input[5] == 0)
+		next_limit <= 11'd222;		// Play A 880.00 Hz
+	    else if (new_input[6] == 1 && last_input[6] == 0)
+		next_limit <= 11'd198;		// Play B 987.77 Hz
+	    else if (new_input[7] == 1 && last_input[7] == 0)
+		next_limit <= 11'd187;		// Play C 1046.5 Hz
+	    else if (new_input == 0)
 		next_limit <= 0;		// Stop playing
 	
-	    last_input <= ui_in;
+	    last_input <= new_input;
+	    new_input <= ui_in;
 
 	end
     end
@@ -118,7 +122,7 @@ module tt_um_rte_sine_synth (
     always @(posedge clk or negedge rst_n) begin
 	if (~rst_n) begin
 	    delta <= 12;
-	    out_val <= 128;
+	    out_val <= 505;	/* 511 - (delta / 2) */
 	    phase_check <= 0;
 	end else begin
 	    /* There is lots of time to do things, so work in three steps:
@@ -131,6 +135,24 @@ module tt_um_rte_sine_synth (
 	     *
 	     * The use of deltas means we only have to hard-code nine
 	     * small values to produce a sine wave.
+	     *
+	     * Deltas are determined by (using octave notation):
+	     * Example for 64 samples per quarter cycle:
+	     * 	x1 = [0.5:63.5] 	# Align phase to a half-integer
+	     *  x2 = x1 * (90 / 64) 	# Convert to phase between 0 and 90 degrees
+	     *  y2 = sin(pi * x2 / 180) # Get the sine values
+	     *  y3 = y2 * 512		# Convert to 10 bit
+	     *  rdelta = y3(2:64) - y3(1:63)
+	     *  delta = floor(rdelta)
+	     *
+	     *  delta-delta encoding:  Enumerate the positions at which the
+	     *  delta value decreases or increase by one.  This is possible
+	     *  since the sine wave is smooth and monotonic over a quarter
+	     *  cycle.
+	     *
+	     *  Out of 64 positions on a quarter cycle, delta starts at 12
+	     *  and decrements at positions:  12, 20, 26, 31, 35, 39, 43,
+	     *  47, 50, 54, 57, 60
 	     */
 
 	    if (event_count == 4) begin
@@ -139,26 +161,34 @@ module tt_um_rte_sine_synth (
 		    phase_check <= phase_count;
 		end else begin
 		    // Backward count
-		    phase_check <= 15 - phase_count;
+		    phase_check <= 63 - phase_count;
 		end
 	    end else if (event_count == 3) begin
 		if (phase_check == 0)
 		    delta <= 12;
-		else if (phase_check == 2)
-		    delta <= 11;
-		else if (phase_check == 5)
-		    delta <= 10;
-		else if (phase_check == 7)
-		    delta <= 9;
-		else if (phase_check == 9)
-		    delta <= 7;
-		else if (phase_check == 10)
-		    delta <= 6;
 		else if (phase_check == 12)
+		    delta <= 11;
+		else if (phase_check == 20)
+		    delta <= 10;
+		else if (phase_check == 26)
+		    delta <= 9;
+		else if (phase_check == 31)
+		    delta <= 8;
+		else if (phase_check == 35)
+		    delta <= 7;
+		else if (phase_check == 39)
+		    delta <= 6;
+		else if (phase_check == 43)
+		    delta <= 5;
+		else if (phase_check == 47)
 		    delta <= 4;
-		else if (phase_check == 13)
+		else if (phase_check == 50)
 		    delta <= 3;
-		else if (phase_check == 15)
+		else if (phase_check == 54)
+		    delta <= 2;
+		else if (phase_check == 57)
+		    delta <= 1;
+		else if (phase_check == 60)
 		    delta <= 0;
 	
 	    end else if (event_count == 2) begin
@@ -171,7 +201,7 @@ module tt_um_rte_sine_synth (
 	end
     end
   
-    assign uo_out  = out_val;
+    assign uo_out  = out_val[9:2];	/* Drop the lowest two bits */
 
     // All but the uppermost bidirectional lines are unused;  set them to zero.
     assign uio_out[6:0] = 7'h00;
