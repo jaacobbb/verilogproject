@@ -1,5 +1,5 @@
 /*
- * tt_um_rte_sine_synth.v
+ * tt_um_sine_synth.v
  *
  * User module with a sine-wave synthesizer
  * synthesizer produces 8-bit outputs for 8 notes C, D, E, F, G, A, B, C
@@ -32,6 +32,7 @@ module tt_um_rte_sine_synth (
     reg [10:0] event_count;	// Divides 50MHz clock into events
     reg [1:0] qtr_count;	// Counts 1/4 phases	
     reg [3:0] phase_count;	// Counts 1/64 phases (1/16 of 1/4)
+    reg [3:0] phase_check;	// Phase or reversed phase
 
     reg [10:0] phase_limit;	// Max count value for the given note
     reg [7:0] last_input;	// Last input value received
@@ -56,9 +57,9 @@ module tt_um_rte_sine_synth (
 	end else begin
 	    if (event_count >= phase_limit) begin
 		event_count <= 0;
-		if (phase_count >= 16) begin
+		if (phase_count == 15) begin
 		    phase_count <= 0;
-		    if (qtr_count >= 4) begin
+		    if (qtr_count == 3) begin
 			qtr_count <= 0;
 		    end else begin
 			qtr_count <= qtr_count + 1;
@@ -130,7 +131,7 @@ module tt_um_rte_sine_synth (
 		    // Backward count
 		    phase_check <= 15 - phase_count;
 		end
-	    end else if (event_count == 2) begin
+	    end else if (event_count == 1) begin
 		if (phase_check == 0)
 		    delta <= 13;
 		else if (phase_check == 2)
