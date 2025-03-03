@@ -12,6 +12,9 @@
 
 `default_nettype none
 
+// Include the PWM module by Michale Bell
+`include "pwm.v"
+
 module tt_um_rte_sine_synth (
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
@@ -72,11 +75,11 @@ module tt_um_rte_sine_synth (
 	    end else begin
 		event_count <= event_count - 1;
 	    end
-	end
 
-	// Only change notes at zero phase.
-	if (event_count == 0 && phase_count == 15 && qtr_count == 3)
-	    phase_limit <= next_limit;
+	    // Only change notes at zero phase.
+	    if (event_count == 0 && phase_count == 15 && qtr_count == 3)
+		phase_limit <= next_limit;
+	end
     end
 
     // Inputs
@@ -88,13 +91,13 @@ module tt_um_rte_sine_synth (
 	    last_input <= ui_in;
 	end else begin
 	    if (ui_in[0] == 1 && last_input[0] == 0)
-		next_limit <= 11'd1493;	// Play C 523.25 Hz
+		next_limit <= 11'd1493;		// Play C 523.25 Hz
 	    else if (ui_in[1] == 1 && last_input[1] == 0)
-		next_limit <= 11'd1330;	// Play D 587.33 Hz
+		next_limit <= 11'd1330;		// Play D 587.33 Hz
 	    else if (ui_in[2] == 1 && last_input[2] == 0)
-		next_limit <= 11'd1185;	// Play E 659.25 Hz
+		next_limit <= 11'd1185;		// Play E 659.25 Hz
 	    else if (ui_in[3] == 1 && last_input[3] == 0)
-		next_limit <= 11'd1119;	// Play F 698.46 Hz
+		next_limit <= 11'd1119;		// Play F 698.46 Hz
 	    else if (ui_in[4] == 1 && last_input[4] == 0)
 		next_limit <= 11'd997;		// Play G 783.99 Hz
 	    else if (ui_in[5] == 1 && last_input[5] == 0)
@@ -170,11 +173,20 @@ module tt_um_rte_sine_synth (
   
     assign uo_out  = out_val;
 
-    // Bidirectional lines are unused;  set them to zero.
-    assign uio_out = 8'h00;
-    assign uio_oe  = 8'h00;
+    // All but the uppermost bidirectional lines are unused;  set them to zero.
+    assign uio_out[6:0] = 7'h00;
+    // The uppermost bidirectional bit is configured as an output
+    assign uio_oe  = 8'h80;
 
     // avoid linter warning about unused pins:
     wire _unused_pins = ena;
+
+    // Instantiate the PWM module
+    pwm_audio pwm (
+	.clk(clk),
+	.rst_n(rst_n),
+	.sample(out_val),
+	.pwm(uio_out[7])
+    );
 
 endmodule  // tt_um_rte_sine_synth
