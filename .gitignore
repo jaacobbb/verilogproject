@@ -3,6 +3,8 @@
 *.vcd
 runs
 tt_submission
+tt
+ttsetup
 src/user_config.json
 src/config_merged.json
 test/sim_build
@@ -12,6 +14,7 @@ test/gate_level_netlist.v
 src/a.out
 src/*.vcd
 fpga/tt_sine_synth/
+fpga/tt10_sine_synth/
 fpga/.Xil/
 fpga/vivado.*
 src/vivado.*
