@@ -1,8 +1,8 @@
 /*
- * tt_um_rte_sine_synth_wrapper.v
+ * tt_generic_wrapper.v
  *
- * Wrapper for Arty A7 board around the
- * TinyTapeout project tt_um_rte_sine_synth.v
+ * Wrapper for Arty A7 board around an unspecified
+ * TinyTapeout project.
  *
  * What this wrapper adds:
  *
@@ -49,9 +49,9 @@ module tt_generic_wrapper (
     generate
         genvar i;
         for (i = 0; i < 8; i = i + 1)
-            assign uio_inout[i] = uio_oe[i] ? uio_in[i] : 1'bz;
+            assign uio_inout[i] = uio_oe[i] ? uio_out[i] : 1'bz;
     endgenerate
-    assign uio_out = uio_inout;
+    assign uio_in = uio_inout;
 
     // Invert reset to project, and halve the clock
 
