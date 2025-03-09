@@ -37,8 +37,8 @@ module tt_um_rte_sine_synth (
     reg [5:0] phase_count;	// Counts 1/256 phases (1/64 of 1/4)
     reg [5:0] phase_check;	// Phase or reversed phase
 
-    reg [10:0] next_limit;	// Max count value for the next note
-    reg [10:0] phase_limit;	// Max count value for the current note
+    reg [8:0] next_limit;	// Max count value for the next note
+    reg [8:0] phase_limit;	// Max count value for the current note
     reg [7:0] last_input;	// Last input value received
     reg [7:0] new_input;	// New input value received
     reg [4:0] delta;		// Output value delta -12 to +12 (-16 to +15)
@@ -94,21 +94,21 @@ module tt_um_rte_sine_synth (
 	    new_input <= ui_in;
 	end else begin
 	    if (new_input[0] == 1 && last_input[0] == 0)
-		next_limit <= 11'd373;		// Play C 523.25 Hz
+		next_limit <= 9'd373;		// Play C 523.25 Hz
 	    else if (new_input[1] == 1 && last_input[1] == 0)
-		next_limit <= 11'd333;		// Play D 587.33 Hz
+		next_limit <= 9'd333;		// Play D 587.33 Hz
 	    else if (new_input[2] == 1 && last_input[2] == 0)
-		next_limit <= 11'd296;		// Play E 659.25 Hz
+		next_limit <= 9'd296;		// Play E 659.25 Hz
 	    else if (new_input[3] == 1 && last_input[3] == 0)
-		next_limit <= 11'd280;		// Play F 698.46 Hz
+		next_limit <= 9'd280;		// Play F 698.46 Hz
 	    else if (new_input[4] == 1 && last_input[4] == 0)
-		next_limit <= 11'd249;		// Play G 783.99 Hz
+		next_limit <= 9'd249;		// Play G 783.99 Hz
 	    else if (new_input[5] == 1 && last_input[5] == 0)
-		next_limit <= 11'd222;		// Play A 880.00 Hz
+		next_limit <= 9'd222;		// Play A 880.00 Hz
 	    else if (new_input[6] == 1 && last_input[6] == 0)
-		next_limit <= 11'd198;		// Play B 987.77 Hz
+		next_limit <= 9'd198;		// Play B 987.77 Hz
 	    else if (new_input[7] == 1 && last_input[7] == 0)
-		next_limit <= 11'd187;		// Play C 1046.5 Hz
+		next_limit <= 9'd187;		// Play C 1046.5 Hz
 	    else if (new_input == 0)
 		next_limit <= 0;		// Stop playing
 	
@@ -193,9 +193,9 @@ module tt_um_rte_sine_synth (
 	
 	    end else if (event_count == 2) begin
 		if (qtr_count == 0 || qtr_count == 3) begin
-		    out_val <= out_val + delta;
+		    out_val <= out_val + {5'd0, delta};
 		end else begin
-		    out_val <= out_val - delta;
+		    out_val <= out_val - {5'd0, delta};
 		end
 	    end
 	end
